@@ -13,11 +13,13 @@ import ListAltIcon from '@mui/icons-material/ListAlt'
 import SearchIcon from '@mui/icons-material/Search'
 import SchoolIcon from '@mui/icons-material/School'
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
+import MapIcon from '@mui/icons-material/Map'
 
 const NAV_ITEMS = [
   { label: 'Início', icon: <HomeIcon />, path: '/' },
   { label: 'Meus Editais', icon: <ListAltIcon />, path: '/editais' },
   { label: 'Buscar no PNCP', icon: <SearchIcon />, path: '/pncp' },
+  { label: 'Mapa de Prospecção', icon: <MapIcon />, path: '/mapa' },
   { label: 'Treinamento IA', icon: <SchoolIcon />, path: '/admin/treinamento' },
 ]
 

@@ -328,3 +328,79 @@ export interface HealthResponse {
   ollamaModel: string
   timestamp: string
 }
+
+// ─── Mapa de Prospecção ──────────────────────────────────────
+
+export interface MapaMunicipio {
+  codigo_ibge: string
+  nome: string
+  uf: string
+  lat: number
+  lng: number
+}
+
+export interface MapaEstadoHeat {
+  uf: string
+  count: number
+  lat: number
+  lng: number
+  updated_at?: string
+}
+
+export interface MapaOrgao {
+  cnpj: string
+  nome: string
+  municipio: string
+  municipio_ibge: string | null
+  lat: number | null
+  lng: number | null
+  total_editais: number
+  ultimo_edital: string | null
+}
+
+export interface BrasilApiCnpj {
+  cnpj: string
+  razao_social: string
+  nome_fantasia: string | null
+  natureza_juridica: { codigo: string; descricao: string }
+  porte: string | null
+  situacao_cadastral: number
+  descricao_situacao_cadastral: string
+  data_situacao_cadastral: string | null
+  logradouro: string | null
+  municipio: string | null
+  uf: string | null
+  cep: string | null
+  telefone: string | null
+  email: string | null
+  atividade_principal: Array<{ codigo: string; descricao: string }>
+}
+
+export interface OrgaoDetalhe {
+  cnpj: string
+  nome: string
+  municipio: string
+  uf: string
+  lat: number | null
+  lng: number | null
+  editais: PNCPContratacao[]
+  ai_resumo: string
+  ai_potencial: 'alto' | 'medio' | 'baixo'
+  ai_recomendacao: string
+  dados_cnpj: BrasilApiCnpj | null
+}
+
+export interface MapaHeatmapResponse {
+  estados: MapaEstadoHeat[]
+  cache_age_minutes: number
+}
+
+export interface MapaOrgaosResponse {
+  orgaos: MapaOrgao[]
+  uf: string
+  total: number
+}
+
+export interface MapaOrgaoDetailResponse {
+  orgao: OrgaoDetalhe
+}

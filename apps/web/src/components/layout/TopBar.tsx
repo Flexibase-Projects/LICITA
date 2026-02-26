@@ -14,6 +14,8 @@ const BREADCRUMBS: Record<string, string> = {
   '/': 'Início',
   '/editais': 'Meus Editais',
   '/pncp': 'Portal PNCP',
+  '/mapa': 'Mapa de Prospecção',
+  '/admin/treinamento': 'Treinamento IA',
 }
 
 interface TopBarProps {

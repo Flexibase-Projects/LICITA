@@ -9,6 +9,7 @@ import EditalListPage from './pages/EditalListPage'
 import EditalDashboardPage from './pages/EditalDashboardPage'
 import PNCPBrowserPage from './pages/PNCPBrowserPage'
 import TrainingAdminPage from './pages/TrainingAdminPage'
+import MapaPage from './pages/MapaPage'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
@@ -39,6 +40,7 @@ export default function App() {
                 <Route path="/editais/:id" element={<EditalDashboardPage />} />
                 <Route path="/pncp" element={<PNCPBrowserPage />} />
                 <Route path="/admin/treinamento" element={<TrainingAdminPage />} />
+                <Route path="/mapa" element={<MapaPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </AppShell>
