@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import RefreshStatsPanel from '../components/mapa/RefreshStatsPanel'
+import type { RefreshStatsState } from '../components/mapa/RefreshStatsPanel'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import Box from '@mui/material/Box'
@@ -9,6 +11,7 @@ import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
+import CircularProgress from '@mui/material/CircularProgress'
 import { useMapaHeatmap } from '../hooks/useMapaHeatmap'
 import { useMapaOrgaos } from '../hooks/useMapaOrgaos'
 import { useOrgaoDetail } from '../hooks/useOrgaoDetail'
@@ -36,7 +39,11 @@ export default function MapaPage() {
   const [selectedCnpj, setSelectedCnpj] = useState<string | null>(null)
   const [showDetailPanel, setShowDetailPanel] = useState(false)
   const [openEditalPreview, setOpenEditalPreview] = useState(false)
-  const [refreshProgress, setRefreshProgress] = useState<{ done: number; total: number; lastUF: string } | null>(null)
+  const [refreshStats, setRefreshStats] = useState<RefreshStatsState | null>(null)
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [valorMin, setValorMin] = useState<number | ''>('')
+  const [valorMax, setValorMax] = useState<number | ''>('')
+  const [preset50k, setPreset50k] = useState(false)
 
   // Dados do heatmap
   const {
@@ -53,12 +60,16 @@ export default function MapaPage() {
     refetch: refetchOrgaos,
   } = useMapaOrgaos(selectedUF)
 
-  // Detalhe do órgão — só busca quando o painel de detalhe está aberto (evita IA ao só clicar no marcador)
+  // Detalhe do órgão — preview=true no dialog (só dados básicos, sem IA); preview=false no painel (com IA)
   const {
     data: orgaoDetailData,
     isLoading: orgaoDetailLoading,
     error: orgaoDetailError,
-  } = useOrgaoDetail(showDetailPanel ? selectedCnpj : null, selectedUF)
+  } = useOrgaoDetail(
+    (showDetailPanel || openEditalPreview) ? selectedCnpj : null,
+    selectedUF,
+    openEditalPreview && !showDetailPanel
+  )
 
   const handleSelectUF = useCallback((uf: string | null) => {
     setSelectedUF(uf)
@@ -72,10 +83,10 @@ export default function MapaPage() {
     setOpenEditalPreview(false)
   }, [])
 
-  // Clique em "Ver edital" na lista: abre painel de detalhe (carrega editais e IA) e dialog do edital
+  // Clique em "Ver edital" na lista: abre apenas dialog com dados básicos da API + link para o site (sem IA)
   const handleVerEdital = useCallback((orgao: { cnpj: string }) => {
     setSelectedCnpj(orgao.cnpj)
-    setShowDetailPanel(true)
+    setShowDetailPanel(false)
     setOpenEditalPreview(true)
   }, [])
 
@@ -83,22 +94,56 @@ export default function MapaPage() {
     setShowDetailPanel(false)
   }, [])
 
+  const handleDismissRefreshStats = useCallback(() => {
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current)
+      dismissTimerRef.current = null
+    }
+    setRefreshStats(null)
+  }, [])
+
+  useEffect(() => {
+    return () => { if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current) }
+  }, [])
+
   const handleRefresh = useCallback(async () => {
-    setRefreshProgress({ done: 0, total: UFS_REFRESH_ORDER.length, lastUF: '' })
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current)
+      dismissTimerRef.current = null
+    }
+    setRefreshStats({ phase: 'refreshing', done: 0, total: UFS_REFRESH_ORDER.length, lastUF: '', totalFetched: 0, totalDiscarded: 0, totalSelected: 0 })
+
+    let accFetched = 0
+    let accDiscarded = 0
+    let accSelected = 0
+
     for (let i = 0; i < UFS_REFRESH_ORDER.length; i++) {
       const uf = UFS_REFRESH_ORDER[i]
       try {
-        await apiClient.get('/api/mapa/refresh', { params: { uf } })
+        const res = await apiClient.get('/api/mapa/refresh', { params: { uf } })
+        const { totalFetched = 0, totalDiscarded = 0, totalSelected = 0 } = res.data ?? {}
+        accFetched += totalFetched
+        accDiscarded += totalDiscarded
+        accSelected += totalSelected
       } catch {
         // segue mesmo se um estado falhar
       }
-      setRefreshProgress((prev) => (prev ? { ...prev, done: i + 1, lastUF: uf } : null))
+      setRefreshStats((prev) =>
+        prev ? { ...prev, done: i + 1, lastUF: uf, totalFetched: accFetched, totalDiscarded: accDiscarded, totalSelected: accSelected } : null
+      )
     }
+
     queryClient.invalidateQueries({ queryKey: ['mapa', 'heatmap'] })
     queryClient.invalidateQueries({ queryKey: ['mapa', 'orgaos'] })
     queryClient.invalidateQueries({ queryKey: ['mapa', 'orgao'] })
     await refetchHeatmap()
-    setRefreshProgress(null)
+
+    setRefreshStats((prev) => prev ? { ...prev, phase: 'done' } : null)
+
+    dismissTimerRef.current = setTimeout(() => {
+      setRefreshStats(null)
+      dismissTimerRef.current = null
+    }, 10_000)
   }, [queryClient, refetchHeatmap])
 
   const handleImportEdital = useCallback(async (codigoPncp: string) => {
@@ -135,7 +180,7 @@ export default function MapaPage() {
   const showSidebar = !!selectedUF
   const orgaoDetail = orgaoDetailData?.orgao
   const firstEdital: PNCPContratacao | undefined = orgaoDetail?.editais?.[0]
-  const showEditalDialog = openEditalPreview && !!firstEdital
+  const showEditalDialog = openEditalPreview
 
   const handleCloseEditalDialog = useCallback(() => {
     setOpenEditalPreview(false)
@@ -147,8 +192,15 @@ export default function MapaPage() {
       <MapaControls
         cacheAgeMinutes={heatmapData?.cache_age_minutes ?? 0}
         isLoading={heatmapLoading}
-        isRefreshing={refreshProgress !== null}
+        isRefreshing={refreshStats?.phase === 'refreshing'}
         onRefresh={handleRefresh}
+        valorMin={valorMin}
+        valorMax={valorMax}
+        preset50k={preset50k}
+        onValorMinChange={(v) => { setPreset50k(false); setValorMin(v) }}
+        onValorMaxChange={(v) => { setPreset50k(false); setValorMax(v) }}
+        onPreset50k={() => { setPreset50k(true); setValorMin(50_000); setValorMax('') }}
+        onClearValorFilter={() => { setPreset50k(false); setValorMin(''); setValorMax('') }}
       />
 
       {/* Área principal: mapa + sidebar */}
@@ -213,6 +265,8 @@ export default function MapaPage() {
                 error={orgaoDetailError instanceof Error ? orgaoDetailError : null}
                 onBack={handleBack}
                 onImportEdital={handleImportEdital}
+                valorMinFilter={preset50k ? 50_000 : (valorMin === '' ? 0 : Number(valorMin))}
+                valorMaxFilter={preset50k ? null : (valorMax === '' ? null : Number(valorMax))}
               />
             ) : (
               <EstadoSidebar
@@ -228,7 +282,7 @@ export default function MapaPage() {
         )}
       </Box>
 
-      {/* Dialog com dados básicos do edital (ao clicar em Ver edital na lista) */}
+      {/* Dialog com dados básicos do edital (ao clicar em Ver edital) — apenas API, sem IA */}
       <Dialog
         open={showEditalDialog}
         onClose={handleCloseEditalDialog}
@@ -242,15 +296,72 @@ export default function MapaPage() {
           },
         }}
       >
-        {firstEdital && (
+        {orgaoDetailLoading ? (
+          <>
+            <DialogTitle sx={{ color: '#F1F5F9', fontSize: '0.9375rem', pb: 0 }}>
+              Dados do edital
+            </DialogTitle>
+            <DialogContent sx={{ pt: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 1, minHeight: 120 }}>
+              <CircularProgress size={32} sx={{ color: '#60A5FA' }} />
+              <Typography variant="body2" sx={{ color: '#94A3B8' }}>Carregando…</Typography>
+            </DialogContent>
+            <DialogActions sx={{ px: 2, pb: 2, pt: 0 }}>
+              <Button size="small" onClick={handleCloseEditalDialog} sx={{ color: '#94A3B8' }}>
+                Fechar
+              </Button>
+            </DialogActions>
+          </>
+        ) : orgaoDetailError ? (
           <>
             <DialogTitle sx={{ color: '#F1F5F9', fontSize: '0.9375rem', pb: 0 }}>
               Dados do edital
             </DialogTitle>
             <DialogContent sx={{ pt: 1.5 }}>
+              <Typography variant="body2" sx={{ color: '#F87171' }}>Erro ao carregar os dados. Tente novamente.</Typography>
+            </DialogContent>
+            <DialogActions sx={{ px: 2, pb: 2, pt: 0 }}>
+              <Button size="small" onClick={handleCloseEditalDialog} sx={{ color: '#94A3B8' }}>
+                Fechar
+              </Button>
+            </DialogActions>
+          </>
+        ) : firstEdital ? (
+          <>
+            <DialogTitle sx={{ color: '#F1F5F9', fontSize: '0.9375rem', pb: 0 }}>
+              Dados do edital (fonte: PNCP)
+            </DialogTitle>
+            <DialogContent sx={{ pt: 1.5 }}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-                <InfoRow label="Objeto" value={firstEdital.objetoCompra} />
+                {firstEdital.numeroControlePNCP && (
+                  <InfoRow label="Nº controle PNCP" value={firstEdital.numeroControlePNCP} />
+                )}
+                {(firstEdital.numeroCompra || firstEdital.anoCompra != null) && (
+                  <InfoRow
+                    label="Número / Ano"
+                    value={[firstEdital.numeroCompra, firstEdital.anoCompra].filter(Boolean).join(' / ') || '—'}
+                  />
+                )}
+                {firstEdital.orgaoEntidade?.razaoSocial && (
+                  <InfoRow label="Órgão" value={firstEdital.orgaoEntidade.razaoSocial} />
+                )}
+                {(firstEdital.unidadeOrgao?.nomeUnidade || firstEdital.unidadeOrgao?.municipioNome) && (
+                  <InfoRow
+                    label="Unidade"
+                    value={
+                      [firstEdital.unidadeOrgao?.nomeUnidade, firstEdital.unidadeOrgao?.municipioNome, firstEdital.unidadeOrgao?.ufSigla]
+                        .filter(Boolean)
+                        .join(' — ') || '—'
+                    }
+                  />
+                )}
+                <InfoRow label="Objeto" value={firstEdital.objetoCompra ?? '—'} />
+                {firstEdital.informacaoComplementar && (
+                  <InfoRow label="Informação complementar" value={firstEdital.informacaoComplementar} />
+                )}
                 <InfoRow label="Valor estimado" value={formatBRL(firstEdital.valorTotalEstimado)} />
+                {firstEdital.valorTotalHomologado != null && firstEdital.valorTotalHomologado > 0 && (
+                  <InfoRow label="Valor homologado" value={formatBRL(firstEdital.valorTotalHomologado)} />
+                )}
                 <InfoRow
                   label="Data publicação"
                   value={
@@ -265,26 +376,49 @@ export default function MapaPage() {
                     value={new Date(firstEdital.dataAberturaProposta).toLocaleDateString('pt-BR')}
                   />
                 )}
-                <InfoRow label="Modalidade" value={firstEdital.modalidadeNome ?? '—'} />
-                <InfoRow label="Situação" value={firstEdital.situacaoCompraNome ?? '—'} />
-                {orgaoDetail && (
-                  <InfoRow label="Órgão" value={`${orgaoDetail.nome} — ${orgaoDetail.municipio}/${orgaoDetail.uf}`} />
+                {firstEdital.dataEncerramentoProposta && (
+                  <InfoRow
+                    label="Encerramento propostas"
+                    value={new Date(firstEdital.dataEncerramentoProposta).toLocaleDateString('pt-BR')}
+                  />
                 )}
+                <InfoRow label="Modalidade" value={firstEdital.modalidadeNome ?? '—'} />
+                <InfoRow label="Modo de disputa" value={firstEdital.modoDisputaNome ?? '—'} />
+                <InfoRow label="Tipo instrumento" value={firstEdital.tipoInstrumentoConvocatorioNome ?? '—'} />
+                <InfoRow label="Situação" value={firstEdital.situacaoCompraNome ?? '—'} />
               </Box>
+              <Typography variant="caption" sx={{ color: '#64748B', mt: 1.5, display: 'block' }}>
+                Para análise com IA, importe o edital na lista de editais.
+              </Typography>
             </DialogContent>
-            <DialogActions sx={{ px: 2, pb: 2, pt: 0 }}>
+            <DialogActions sx={{ px: 2, pb: 2, pt: 0, flexDirection: 'column', alignItems: 'stretch', gap: 1 }}>
               <Button
                 size="small"
+                component="a"
                 href={
                   firstEdital.linkSistemaOrigem ??
                   `https://pncp.gov.br/app/editais/${(firstEdital.orgaoEntidade?.cnpj ?? '').replace(/\D/g, '')}/${firstEdital.anoCompra}/${firstEdital.sequencialCompra}`
                 }
                 target="_blank"
                 rel="noopener noreferrer"
-                sx={{ color: '#60A5FA', textTransform: 'none' }}
+                sx={{ color: '#60A5FA', textTransform: 'none', justifyContent: 'flex-start' }}
               >
-                Abrir no PNCP
+                Clique aqui para acessar o edital no site
               </Button>
+              <Button size="small" onClick={handleCloseEditalDialog} sx={{ color: '#94A3B8' }}>
+                Fechar
+              </Button>
+            </DialogActions>
+          </>
+        ) : (
+          <>
+            <DialogTitle sx={{ color: '#F1F5F9', fontSize: '0.9375rem', pb: 0 }}>
+              Dados do edital
+            </DialogTitle>
+            <DialogContent sx={{ pt: 1.5 }}>
+              <Typography variant="body2" sx={{ color: '#94A3B8' }}>Nenhum edital encontrado para este órgão.</Typography>
+            </DialogContent>
+            <DialogActions sx={{ px: 2, pb: 2, pt: 0 }}>
               <Button size="small" onClick={handleCloseEditalDialog} sx={{ color: '#94A3B8' }}>
                 Fechar
               </Button>
@@ -293,34 +427,7 @@ export default function MapaPage() {
         )}
       </Dialog>
 
-      {/* Notificação flutuante: progresso do refresh por estado */}
-      {refreshProgress && (
-        <Box
-          sx={{
-            position: 'fixed',
-            bottom: 24,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 1400,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            px: 2,
-            py: 1,
-            borderRadius: 2,
-            bgcolor: 'rgba(15, 23, 42, 0.95)',
-            border: '1px solid rgba(96, 165, 250, 0.35)',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-          }}
-        >
-          <Typography sx={{ color: '#94A3B8', fontSize: '0.75rem', fontWeight: 600 }}>
-            {refreshProgress.lastUF ? `${refreshProgress.lastUF} concluído` : 'Atualizando…'}
-          </Typography>
-          <Typography sx={{ color: '#60A5FA', fontSize: '0.75rem', fontWeight: 700 }}>
-            {refreshProgress.done}/{refreshProgress.total}
-          </Typography>
-        </Box>
-      )}
+      <RefreshStatsPanel state={refreshStats} onDismiss={handleDismissRefreshStats} />
     </Box>
   )
 }

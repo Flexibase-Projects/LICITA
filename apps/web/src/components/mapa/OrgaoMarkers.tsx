@@ -89,21 +89,36 @@ export default function OrgaoMarkers({ uf, orgaos, selectedCnpj, onSelectOrgao }
               <br />
               {orgao.municipio} · {orgao.total_editais} edital(is)
             </Tooltip>
-            <Popup minWidth={220}>
-              <Box sx={{ fontFamily: 'inherit' }}>
-                <Typography variant="body2" fontWeight={700} gutterBottom>
+            <Popup className="mapa-orgao-popup" minWidth={160}>
+              <Box
+                sx={{
+                  fontFamily: 'inherit',
+                  bgcolor: 'transparent',
+                  color: '#E2E8F0',
+                  p: 0,
+                  m: 0,
+                  minWidth: 0,
+                }}
+              >
+                <Typography variant="caption" component="div" sx={{ fontWeight: 700, fontSize: '0.7rem', lineHeight: 1.3, color: '#F1F5F9' }}>
                   {orgao.nome}
                 </Typography>
-                <Typography variant="caption" color="text.secondary" display="block">
-                  {orgao.municipio}
-                </Typography>
-                <Typography variant="caption" color="primary" display="block" sx={{ mt: 0.5 }}>
-                  {orgao.total_editais} edital(is) de mobiliário
+                <Typography variant="caption" component="div" sx={{ fontSize: '0.65rem', color: '#94A3B8', mt: 0.25 }}>
+                  {orgao.municipio} · {orgao.total_editais} edital(is)
                 </Typography>
                 <Button
                   size="small"
                   variant="contained"
-                  sx={{ mt: 1, fontSize: '0.7rem' }}
+                  sx={{
+                    mt: 0.75,
+                    fontSize: '0.65rem',
+                    py: 0.25,
+                    px: 1,
+                    minHeight: 0,
+                    bgcolor: '#0EA472',
+                    color: '#fff',
+                    '&:hover': { bgcolor: '#0d9668' },
+                  }}
                   onClick={() => onSelectOrgao(orgao.cnpj)}
                 >
                   Ver detalhes

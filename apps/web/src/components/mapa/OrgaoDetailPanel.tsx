@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import CircularProgress from '@mui/material/CircularProgress'
@@ -31,6 +32,10 @@ interface OrgaoDetailPanelProps {
   error: Error | null
   onBack: () => void
   onImportEdital: (codigoPncp: string) => void
+  /** Filtro de valor definido na barra do mapa (valor mínimo em R$) */
+  valorMinFilter?: number
+  /** Filtro de valor definido na barra do mapa (valor máximo em R$, null = sem máximo) */
+  valorMaxFilter?: number | null
 }
 
 const POTENCIAL_CONFIG = {
@@ -45,6 +50,8 @@ export default function OrgaoDetailPanel({
   error,
   onBack,
   onImportEdital,
+  valorMinFilter = 0,
+  valorMaxFilter = null,
 }: OrgaoDetailPanelProps) {
   if (isLoading) {
     return (
@@ -71,6 +78,15 @@ export default function OrgaoDetailPanel({
   if (!orgao) return null
 
   const potencial = POTENCIAL_CONFIG[orgao.ai_potencial] ?? POTENCIAL_CONFIG.medio
+
+  const filteredEditais = useMemo(() => {
+    return orgao.editais.filter((e) => {
+      const v = e.valorTotalEstimado ?? 0
+      return v >= valorMinFilter && (valorMaxFilter == null || v <= valorMaxFilter)
+    })
+  }, [orgao.editais, valorMinFilter, valorMaxFilter])
+
+  const hasValorFilter = valorMinFilter > 0 || valorMaxFilter != null
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -181,15 +197,18 @@ export default function OrgaoDetailPanel({
           </AccordionDetails>
         </Accordion>
 
-        {/* Editais — tabela */}
+        {/* Editais — tabela (filtro de valor definido na barra do mapa) */}
         <Box>
           <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 0.75, fontSize: '0.65rem' }}>
-            Editais (mobiliário / assento / cadeira / mesa / armário) — {orgao.editais.length}
+            Editais — {filteredEditais.length}
+            {hasValorFilter && ` de ${orgao.editais.length} (filtro valor na barra)`}
           </Typography>
 
-          {orgao.editais.length === 0 ? (
+          {filteredEditais.length === 0 ? (
             <Typography variant="body2" sx={{ color: '#64748B', textAlign: 'center', py: 1.5, fontSize: '0.8125rem' }}>
-              Nenhum edital encontrado neste período.
+              {orgao.editais.length === 0
+                ? 'Nenhum edital encontrado neste período.'
+                : 'Nenhum edital no intervalo de valor. Ajuste o filtro na barra acima.'}
             </Typography>
           ) : (
             <Table size="small" sx={{ '& .MuiTableCell-root': { fontSize: '0.75rem', py: 0.5 }, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 1, overflow: 'hidden' }}>
@@ -202,7 +221,7 @@ export default function OrgaoDetailPanel({
                 </TableRow>
               </TableHead>
               <TableBody>
-                {orgao.editais.slice(0, 15).map((edital) => {
+                {filteredEditais.slice(0, 15).map((edital) => {
                   const cnpjDigits = (edital.orgaoEntidade?.cnpj ?? '').replace(/\D/g, '')
                   const pncpUrl = edital.linkSistemaOrigem
                     ?? `https://pncp.gov.br/app/editais/${cnpjDigits}/${edital.anoCompra}/${edital.sequencialCompra}`

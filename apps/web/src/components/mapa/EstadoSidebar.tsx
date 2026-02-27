@@ -319,7 +319,7 @@ export default function EstadoSidebar({
                             },
                           }}
                         >
-                          Ver edital
+                          Detalhes
                         </Button>
                       </TableCell>
                     </TableRow>

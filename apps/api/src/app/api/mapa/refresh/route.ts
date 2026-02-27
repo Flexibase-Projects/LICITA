@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   const { uf } = parsed.data
 
   try {
-    const { orgaos, totalEditaisUf } = await buildOrgaosForUf(uf)
+    const { orgaos, totalEditaisUf, totalFetched } = await buildOrgaosForUf(uf)
     await supabaseAdmin
       .from('mapa_orgaos_cache')
       .upsert(
@@ -35,7 +35,9 @@ export async function GET(req: NextRequest) {
         },
         { onConflict: 'uf' }
       )
-    return NextResponse.json({ ok: true, uf, total: orgaos.length })
+    const totalSelected = totalEditaisUf
+    const totalDiscarded = totalFetched - totalSelected
+    return NextResponse.json({ ok: true, uf, total: orgaos.length, totalFetched, totalDiscarded, totalSelected })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     return NextResponse.json({ error: `Erro ao atualizar ${uf}: ${msg}` }, { status: 502 })

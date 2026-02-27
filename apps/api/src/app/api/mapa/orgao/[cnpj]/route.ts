@@ -3,21 +3,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { searchContratacoes, formatCnpjForPncp } from '@/lib/pncpClient'
 import { ollamaGenerate, DEFAULT_MODEL } from '@/lib/ollamaClient'
+import { getDateRange, contemKeyword } from '@/lib/mapaCache'
 import type { BrasilApiCnpj, MapaOrgaoDetailResponse, OrgaoDetalhe, PNCPContratacao } from '@licita/shared-types'
-
-// Filtro OR: basta um termo (mobiliário OU assento OU cadeira OU mesa OU armário...)
-const KEYWORDS = [
-  'MOBILIARIO', 'MOBILIÁRIO', 'MOBILIARIOS', 'MOBILIÁRIOS',
-  'ASSENTO', 'ASSENTOS', 'CADEIRA', 'CADEIRAS', 'MESA', 'MESAS',
-  'ESTANTE', 'ESTANTES', 'ARMARIO', 'ARMÁRIO', 'ARMARIOS', 'ARMÁRIOS',
-  'CARTEIRA ESCOLAR', 'CARTEIRA UNIVERSITARIA', 'GUARDAROUPA', 'GUARDA-ROUPA',
-]
-
-function contemKeyword(texto: string): boolean {
-  if (!texto || typeof texto !== 'string') return false
-  const upper = texto.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  return KEYWORDS.some((kw) => upper.includes(kw.normalize('NFD').replace(/[\u0300-\u036f]/g, '')))
-}
 
 async function fetchBrasilApiCnpj(cnpj: string): Promise<BrasilApiCnpj | null> {
   const digits = cnpj.replace(/\D/g, '')
@@ -33,13 +20,9 @@ async function fetchBrasilApiCnpj(cnpj: string): Promise<BrasilApiCnpj | null> {
   }
 }
 
+/** Mesmo período do cache (6 meses) para que os editais encontrados coincidam com a lista do mapa. */
 async function fetchEditalsPncp(cnpj: string, uf?: string): Promise<PNCPContratacao[]> {
-  const end = new Date()
-  const start = new Date()
-  start.setFullYear(start.getFullYear() - 2) // últimos 2 anos
-
-  const dataInicial = start.toISOString().slice(0, 10).replace(/-/g, '')
-  const dataFinal = end.toISOString().slice(0, 10).replace(/-/g, '')
+  const { dataInicial, dataFinal } = getDateRange()
   const tamanhoPagina = 50
   const maxPaginas = 5
   const allData: PNCPContratacao[] = []
@@ -136,7 +119,8 @@ export async function GET(
   { params }: { params: Promise<{ cnpj: string }> }
 ) {
   const { cnpj } = await params
-  const uf = req.nextUrl.searchParams.get('uf') ?? undefined
+  const ufParam = req.nextUrl.searchParams.get('uf') ?? undefined
+  const preview = req.nextUrl.searchParams.get('preview') === '1'
 
   if (!cnpj || cnpj.replace(/\D/g, '').length !== 14) {
     return NextResponse.json({ error: 'CNPJ inválido' }, { status: 400 })
@@ -146,21 +130,39 @@ export async function GET(
     // Buscar em paralelo: dados CNPJ + editais PNCP (com UF quando disponível = mais eficiente)
     const [dadosCnpj, editais] = await Promise.all([
       fetchBrasilApiCnpj(cnpj),
-      fetchEditalsPncp(cnpj, uf),
+      fetchEditalsPncp(cnpj, ufParam),
     ])
 
-    const nome = dadosCnpj?.razao_social ?? 'Órgão público'
+    const nome = dadosCnpj?.razao_social ?? editais[0]?.unidadeOrgao?.razaoSocial ?? 'Órgão público'
     const municipio = dadosCnpj?.municipio ?? editais[0]?.unidadeOrgao?.municipioNome ?? ''
-    const uf = dadosCnpj?.uf ?? editais[0]?.unidadeOrgao?.ufSigla ?? ''
+    const ufResolved = dadosCnpj?.uf ?? editais[0]?.unidadeOrgao?.ufSigla ?? ufParam ?? ''
 
-    // Análise IA
-    const ia = await gerarResumoIA({ cnpj, nome, municipio, uf, dadosCnpj, editais })
+    // Preview (dialog "Ver edital"): só dados básicos, sem IA — evita timeout/erro de Ollama
+    if (preview) {
+      const orgao: OrgaoDetalhe = {
+        cnpj,
+        nome,
+        municipio,
+        uf: ufResolved,
+        lat: null,
+        lng: null,
+        editais,
+        ai_resumo: '',
+        ai_potencial: 'medio',
+        ai_recomendacao: '',
+        dados_cnpj: dadosCnpj,
+      }
+      return NextResponse.json<MapaOrgaoDetailResponse>({ orgao })
+    }
+
+    // Detalhe completo: inclui análise IA
+    const ia = await gerarResumoIA({ cnpj, nome, municipio, uf: ufResolved, dadosCnpj, editais })
 
     const orgao: OrgaoDetalhe = {
       cnpj,
       nome,
       municipio,
-      uf,
+      uf: ufResolved,
       lat: null,
       lng: null,
       editais,

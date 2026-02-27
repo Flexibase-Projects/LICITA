@@ -6,11 +6,26 @@ import { searchContratacoes } from '@/lib/pncpClient'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import type { BrasilApiCnpj, MapaOrgao, PNCPContratacao } from '@licita/shared-types'
 
+/** Termos que indicam compra de mobiliário escolar/corporativo (objeto do edital). Exclusões removem falsos positivos. */
 export const KEYWORDS = [
   'MOBILIARIO', 'MOBILIÁRIO', 'MOBILIARIOS', 'MOBILIÁRIOS',
-  'ASSENTO', 'ASSENTOS', 'CADEIRA', 'CADEIRAS', 'MESA', 'MESAS',
-  'ESTANTE', 'ESTANTES', 'ARMARIO', 'ARMÁRIO', 'ARMARIOS', 'ARMÁRIOS',
-  'CARTEIRA ESCOLAR', 'CARTEIRA UNIVERSITARIA', 'GUARDAROUPA', 'GUARDA-ROUPA',
+  'CARTEIRA ESCOLAR', 'CARTEIRA UNIVERSITARIA', 'CADEIRA ESCOLAR', 'MESA ESCOLAR',
+  'ARMARIO', 'ARMÁRIO', 'ARMARIOS', 'ARMÁRIOS',
+  'ESTANTE', 'ESTANTES',
+  'GUARDAROUPA', 'GUARDA-ROUPA', 'GUARDA ROUPA',
+  'ASSENTO', 'ASSENTOS',
+  'CADEIRA', 'CADEIRAS', 'MESA', 'MESAS', // genéricos; exclusions removem cadeira de rodas, mesa de cirurgia etc.
+]
+
+/** Expressões que indicam NÃO ser mobiliário de interesse (excluir para reduzir ruído). */
+export const EXCLUSIONS = [
+  'CADEIRA DE RODAS', 'CADEIRAS DE RODAS',
+  'MESA DE CIRURGIA', 'MESA CIRURGICA', 'MESA CIRÚRGICA',
+  'MESA DE OPERAÇÃO', 'MESA DE OPERAÇÕES', 'MESA OPERACIONAL',
+  'MESA DE NEGOCIAÇÃO', 'MESA DE NEGOCIACAO',
+  'CADEIRA DE PRAIA',
+  'MESA ELETRONICA', 'MESA ELETRÔNICA', // mesa de votação
+  'CADEIRA ELETRONICA', 'CADEIRA ELETRÔNICA', // urna/cadeira de votação
 ]
 
 export const CACHE_TTL_MINUTES = 30
@@ -18,10 +33,15 @@ export const DATE_RANGE_MONTHS = 6
 export const MAX_PAGINAS = 5
 export const TAMANHO_PAGINA = 50
 
+function normalize(t: string): string {
+  return (t || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 export function contemKeyword(texto: string): boolean {
   if (!texto || typeof texto !== 'string') return false
-  const upper = texto.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  return KEYWORDS.some((kw) => upper.includes(kw.normalize('NFD').replace(/[\u0300-\u036f]/g, '')))
+  const upper = normalize(texto)
+  if (EXCLUSIONS.some((ex) => upper.includes(normalize(ex)))) return false
+  return KEYWORDS.some((kw) => upper.includes(normalize(kw)))
 }
 
 export function getDateRange() {
@@ -37,6 +57,7 @@ export function getDateRange() {
 export interface BuildOrgaosResult {
   orgaos: MapaOrgao[]
   totalEditaisUf: number
+  totalFetched: number
 }
 
 const NOMINATIM_DELAY_MS = 1100
@@ -130,18 +151,25 @@ export async function buildOrgaosForUf(uf: string): Promise<BuildOrgaosResult> {
   const { dataInicial, dataFinal } = getDateRange()
   const allData: PNCPContratacao[] = []
 
-  for (let pagina = 1; pagina <= MAX_PAGINAS; pagina++) {
-    const pncpResult = await searchContratacoes({
-      dataInicial,
-      dataFinal,
-      uf: uf.toUpperCase().slice(0, 2),
-      tamanhoPagina: TAMANHO_PAGINA,
-      pagina,
-    })
-    allData.push(...pncpResult.data)
-    if (pagina >= (pncpResult.totalPaginas ?? 1) || pncpResult.data.length < TAMANHO_PAGINA) break
+  const ufNormalized = uf.toUpperCase().slice(0, 2)
+  const baseParams = { dataInicial, dataFinal, uf: ufNormalized, tamanhoPagina: TAMANHO_PAGINA }
+
+  // Buscar página 1 para descobrir totalPaginas
+  const firstResult = await searchContratacoes({ ...baseParams, pagina: 1 })
+  allData.push(...firstResult.data)
+
+  // Buscar páginas restantes em paralelo (sem rate limit no PNCP)
+  const totalPaginas = Math.min(firstResult.totalPaginas ?? 1, MAX_PAGINAS)
+  if (firstResult.data.length === TAMANHO_PAGINA && totalPaginas > 1) {
+    const remainingResults = await Promise.all(
+      Array.from({ length: totalPaginas - 1 }, (_, i) =>
+        searchContratacoes({ ...baseParams, pagina: i + 2 })
+      )
+    )
+    for (const r of remainingResults) allData.push(...r.data)
   }
 
+  const totalFetched = allData.length
   const matchingEditais = allData.filter((c) => contemKeyword(c.objetoCompra ?? ''))
 
   const orgaosMap = new Map<string, {
@@ -192,7 +220,7 @@ export async function buildOrgaosForUf(uf: string): Promise<BuildOrgaosResult> {
     }
   }
 
-  const ufNorm = uf.toUpperCase().slice(0, 2)
+  const ufNorm = ufNormalized
 
   // Geocodificar por (município + UF) quando não há coords no banco; chave normalizada (sem acento)
   const toGeocode = new Map<string, { codigoIBGE: string; municipio: string }>()
@@ -276,5 +304,5 @@ export async function buildOrgaosForUf(uf: string): Promise<BuildOrgaosResult> {
     .sort((a, b) => b.total_editais - a.total_editais)
 
   const totalEditaisUf = orgaos.reduce((sum, o) => sum + o.total_editais, 0)
-  return { orgaos, totalEditaisUf }
+  return { orgaos, totalEditaisUf, totalFetched }
 }

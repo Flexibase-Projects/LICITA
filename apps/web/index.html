@@ -21,6 +21,45 @@
       .refresh-icon-spin {
         animation: refresh-spin 0.9s linear infinite;
       }
+      /* Controles de zoom do Leaflet — tema escuro na página do mapa */
+      .leaflet-control-zoom {
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+      }
+      .leaflet-control-zoom a {
+        background-color: #1e293b !important;
+        color: #e2e8f0 !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+      }
+      .leaflet-control-zoom a:last-child {
+        border-bottom: none !important;
+      }
+      .leaflet-control-zoom a:hover {
+        background-color: #334155 !important;
+        color: #f8fafc !important;
+      }
+      /* Popup dos marcadores do mapa — tema escuro e compacto */
+      .leaflet-popup.mapa-orgao-popup .leaflet-popup-content-wrapper,
+      .leaflet-popup .leaflet-popup-content-wrapper.mapa-orgao-popup {
+        background: #1e293b;
+        color: #e2e8f0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+      }
+      .leaflet-popup.mapa-orgao-popup .leaflet-popup-content,
+      .leaflet-popup .leaflet-popup-content-wrapper.mapa-orgao-popup .leaflet-popup-content {
+        margin: 6px 8px;
+        min-width: 0;
+        font-size: 0.75rem;
+      }
+      .leaflet-popup.mapa-orgao-popup .leaflet-popup-tip,
+      .leaflet-popup:has(.leaflet-popup-content-wrapper.mapa-orgao-popup) .leaflet-popup-tip {
+        background: #1e293b;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-bottom: none;
+        border-right: none;
+      }
     </style>
     <title>LICITA-Pro — Análise Inteligente de Editais</title>
     <meta name="description" content="Sistema profissional de análise de editais de licitação com IA local" />
