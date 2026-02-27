@@ -2,37 +2,36 @@ import { useState } from 'react'
 import Box from '@mui/material/Box'
 import Drawer from '@mui/material/Drawer'
 import Sidebar from './Sidebar'
-import TopBar from './TopBar'
 
-const DRAWER_WIDTH = 240
+/** Larguras padrão Flexbase: 72px recolhida, 240px expandida */
+const SIDEBAR_WIDTH_EXPANDED = 240
+const SIDEBAR_WIDTH_COLLAPSED = 72
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const toggleSidebar = () => setSidebarOpen((v) => !v)
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      {/* Sidebar desktop (permanente) */}
+      {/* Sidebar (expandir/recolher pelo botão dentro da própria sidebar) */}
       <Drawer
         variant="permanent"
         sx={{
-          width: sidebarOpen ? DRAWER_WIDTH : 64,
+          width: sidebarOpen ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED,
           flexShrink: 0,
           '& .MuiDrawer-paper': {
-            width: sidebarOpen ? DRAWER_WIDTH : 64,
-            transition: 'width 0.2s ease',
+            width: sidebarOpen ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED,
+            transition: 'width 0.3s ease',
             overflowX: 'hidden',
           },
         }}
       >
-        <Sidebar collapsed={!sidebarOpen} />
+        <Sidebar collapsed={!sidebarOpen} onToggleCollapsed={toggleSidebar} />
       </Drawer>
 
-      {/* Área principal */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <TopBar onToggleSidebar={() => setSidebarOpen((v) => !v)} />
-        <Box component="main" sx={{ flex: 1, p: 3, overflow: 'auto' }}>
-          {children}
-        </Box>
+      {/* Área principal (sem header — título, usuário e sair ficam na sidebar) */}
+      <Box component="main" sx={{ flex: 1, p: 3, overflow: 'auto', minWidth: 0 }}>
+        {children}
       </Box>
     </Box>
   )
