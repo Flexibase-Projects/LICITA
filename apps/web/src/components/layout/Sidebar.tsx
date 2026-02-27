@@ -13,12 +13,15 @@ import SearchIcon from '@mui/icons-material/Search'
 import SchoolIcon from '@mui/icons-material/School'
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
 import MapIcon from '@mui/icons-material/Map'
+import BusinessCenterIcon from '@mui/icons-material/BusinessCenter'
+import LocalShippingIcon from '@mui/icons-material/LocalShipping'
 import MenuIcon from '@mui/icons-material/Menu'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import Brightness4Icon from '@mui/icons-material/Brightness4'
 import Brightness7Icon from '@mui/icons-material/Brightness7'
 import HelpIcon from '@mui/icons-material/Help'
 import ExitToAppIcon from '@mui/icons-material/ExitToApp'
+import SettingsIcon from '@mui/icons-material/Settings'
 import { supabase } from '../../services/supabaseClient'
 
 /** Seções da sidebar agrupadas por área/agente (padrão Flexbase) */
@@ -30,8 +33,15 @@ const SIDEBAR_SECTIONS: { title: string; items: NavItem[] }[] = [
     items: [{ id: 'home', label: 'Início', path: '/', icon: HomeIcon }],
   },
   {
+    title: 'EMPRESA',
+    items: [{ id: 'operacao', label: 'Cérebro da Operação', path: '/operacao', icon: BusinessCenterIcon }],
+  },
+  {
     title: 'EDITAIS',
-    items: [{ id: 'editais', label: 'Meus Editais', path: '/editais', icon: ListAltIcon }],
+    items: [
+      { id: 'editais', label: 'Meus Editais', path: '/editais', icon: ListAltIcon },
+      { id: 'viabilidade-logistica', label: 'Viabilidade Logística', path: '/editais/viabilidade-logistica', icon: LocalShippingIcon },
+    ],
   },
   {
     title: 'PROSPECÇÃO',
@@ -42,7 +52,10 @@ const SIDEBAR_SECTIONS: { title: string; items: NavItem[] }[] = [
   },
   {
     title: 'ADMINISTRAÇÃO',
-    items: [{ id: 'treinamento', label: 'Treinamento IA', path: '/admin/treinamento', icon: SchoolIcon }],
+    items: [
+      { id: 'treinamento', label: 'Treinamento IA', path: '/admin/treinamento', icon: SchoolIcon },
+      { id: 'parametros', label: 'Parâmetros e APIs', path: '/admin/parametros', icon: SettingsIcon },
+    ],
   },
 ]
 
@@ -248,7 +261,12 @@ export default function Sidebar({
             {section.items.map((item) => {
               const Icon = item.icon
               const isActive =
-                pathname === item.path || (item.path !== '/' && pathname.startsWith(item.path))
+                pathname === item.path ||
+                (item.path !== '/' &&
+                  pathname.startsWith(item.path) &&
+                  (item.path !== '/editais' ||
+                    pathname === '/editais' ||
+                    pathname === '/editais/viabilidade-logistica' ? false : pathname.startsWith('/editais/')))
               return (
                 <ListItem key={item.id} disablePadding sx={{ mb: 0.25 }}>
                   <Tooltip title={collapsed ? item.label : ''} placement="right">
@@ -392,7 +410,7 @@ export default function Sidebar({
             component="span"
             sx={{ fontSize: '0.6875rem', color: 'rgba(241,245,249,0.45)', flexShrink: 0 }}
           >
-            v1.0.0
+            v1.0.1
           </Typography>
         </Box>
         <Tooltip title={collapsed ? 'Sair' : ''} placement="right">

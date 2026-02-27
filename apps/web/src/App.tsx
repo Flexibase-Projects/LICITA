@@ -10,6 +10,9 @@ import EditalDashboardPage from './pages/EditalDashboardPage'
 import PNCPBrowserPage from './pages/PNCPBrowserPage'
 import TrainingAdminPage from './pages/TrainingAdminPage'
 import MapaPage from './pages/MapaPage'
+import OperacaoConfigPage from './pages/OperacaoConfigPage'
+import ViabilidadeLogisticaPage from './pages/ViabilidadeLogisticaPage'
+import ParametrosPage from './pages/ParametrosPage'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
@@ -36,10 +39,13 @@ export default function App() {
             <AppShell>
               <Routes>
                 <Route path="/" element={<HomePage />} />
+                <Route path="/operacao" element={<OperacaoConfigPage />} />
                 <Route path="/editais" element={<EditalListPage />} />
+                <Route path="/editais/viabilidade-logistica" element={<ViabilidadeLogisticaPage />} />
                 <Route path="/editais/:id" element={<EditalDashboardPage />} />
                 <Route path="/pncp" element={<PNCPBrowserPage />} />
                 <Route path="/admin/treinamento" element={<TrainingAdminPage />} />
+                <Route path="/admin/parametros" element={<ParametrosPage />} />
                 <Route path="/mapa" element={<MapaPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
