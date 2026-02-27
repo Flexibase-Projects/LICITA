@@ -1,14 +1,21 @@
+import { useState } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
 import Chip from '@mui/material/Chip'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
+import ListItemText from '@mui/material/ListItemText'
 import TextField from '@mui/material/TextField'
 import InputAdornment from '@mui/material/InputAdornment'
 import Slider from '@mui/material/Slider'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import WifiIcon from '@mui/icons-material/Wifi'
 import FilterListIcon from '@mui/icons-material/FilterList'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+
+const FILTRO_TERMOS = ['MOBILIÁRIO', 'ASSENTO', 'CADEIRA', 'MESA', 'ARMÁRIO']
 
 const SLIDER_MIN = 0
 const SLIDER_MAX = 2_000_000 // 2 milhões
@@ -46,6 +53,7 @@ export default function MapaControls({
   onPreset50k,
   onClearValorFilter,
 }: MapaControlsProps) {
+  const [termosAnchor, setTermosAnchor] = useState<null | HTMLElement>(null)
   const updating = isLoading || isRefreshing
   const hasValorFilter = preset50k || valorMin !== '' || valorMax !== ''
   return (
