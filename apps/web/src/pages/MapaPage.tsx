@@ -187,7 +187,7 @@ export default function MapaPage() {
   }, [])
 
   return (
-    <Box sx={{ mx: -3, mt: -3, mb: -3, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', bgcolor: '#0F172A', overflow: 'hidden' }}>
+    <Box sx={{ mx: -3, mt: -3, mb: -3, display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: '#0F172A', overflow: 'hidden' }}>
       {/* Barra de controles */}
       <MapaControls
         cacheAgeMinutes={heatmapData?.cache_age_minutes ?? 0}

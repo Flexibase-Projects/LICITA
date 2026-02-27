@@ -3,6 +3,7 @@ import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
+import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
 import Menu from '@mui/material/Menu'
 import MenuItem from '@mui/material/MenuItem'
@@ -74,21 +75,51 @@ export default function MapaControls({
         Filtro (1 termo já inclui):
       </Typography>
 
-      {/* Keywords fixas — Mobiliário OU assento OU cadeira OU mesa OU armário... */}
-      {['MOBILIÁRIO', 'ASSENTO', 'CADEIRA', 'MESA', 'ARMÁRIO'].map((kw) => (
-        <Chip
-          key={kw}
-          label={kw}
-          size="small"
-          sx={{
-            bgcolor: 'rgba(14, 164, 114, 0.15)',
-            color: '#0EA472',
-            border: '1px solid rgba(14, 164, 114, 0.3)',
-            fontWeight: 600,
-            fontSize: '0.7rem',
-          }}
-        />
-      ))}
+      {/* Dropdown compacto: mostra só a quantidade; ao clicar lista os termos */}
+      <Button
+        size="small"
+        endIcon={<ExpandMoreIcon sx={{ fontSize: 14 }} />}
+        onClick={(e) => setTermosAnchor(e.currentTarget)}
+        sx={{
+          minWidth: 0,
+          height: 22,
+          py: 0,
+          px: 1,
+          fontSize: '0.65rem',
+          fontWeight: 600,
+          textTransform: 'none',
+          bgcolor: 'rgba(14, 164, 114, 0.15)',
+          color: '#0EA472',
+          border: '1px solid rgba(14, 164, 114, 0.3)',
+          '&:hover': { bgcolor: 'rgba(14, 164, 114, 0.25)', borderColor: 'rgba(14, 164, 114, 0.5)' },
+        }}
+      >
+        {FILTRO_TERMOS.length} termos
+      </Button>
+      <Menu
+        anchorEl={termosAnchor}
+        open={Boolean(termosAnchor)}
+        onClose={() => setTermosAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 1,
+              bgcolor: '#1E293B',
+              border: '1px solid rgba(255,255,255,0.08)',
+              minWidth: 160,
+              '& .MuiListItem-root': { py: 0.5 },
+            },
+          },
+        }}
+      >
+        {FILTRO_TERMOS.map((kw) => (
+          <MenuItem key={kw} disabled>
+            <ListItemText primary={kw} primaryTypographyProps={{ fontSize: '0.75rem', color: '#E2E8F0' }} />
+          </MenuItem>
+        ))}
+      </Menu>
 
       {/* Filtro por valor — slider de intervalo (arrastar bolinhas) + preset e inputs sem setas */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 0.5, flexWrap: 'wrap' }}>
